@@ -1,0 +1,41 @@
+# Ambiente e segredos
+.env
+.env.local
+*.pfx
+*.pem
+*.key
+
+# Dados reais de rede: nada de inventario de producao no repositorio
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Node
+node_modules/
+frontend/dist/
+.vite/
+
+# Ferramentas de IA (nao versionadas)
+.claude/
+CLAUDE.md
+AGENTS.md
+.mcp.json
+
+# Sistema operacional / editores
+Thumbs.db
+.DS_Store
+.idea/
+.vscode/
