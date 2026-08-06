@@ -15,7 +15,8 @@ from netpulse.collector import Collector
 from netpulse.config import get_settings
 from netpulse.db import init_db, session_scope
 from netpulse.demo import seed_demo
-from netpulse.models import Asset, Check, CheckResult, Status
+from netpulse.models import Asset, Status
+from netpulse.queries import asset_snapshots
 from netpulse.scheduler import DEFAULT_TICK_SECONDS, run_forever
 
 app = typer.Typer(
@@ -114,6 +115,19 @@ def watch(
 
 
 @app.command()
+def serve(
+    host: str = typer.Option("127.0.0.1", "--host"),
+    port: int = typer.Option(8000, "--port"),
+    reload: bool = typer.Option(False, "--reload", help="Recarrega ao salvar (desenvolvimento)."),
+) -> None:
+    """Sobe a API HTTP."""
+    import uvicorn
+
+    console.print(f"API em http://{host}:{port}  ·  documentacao em http://{host}:{port}/docs")
+    uvicorn.run("netpulse.api.app:app", host=host, port=port, reload=reload)
+
+
+@app.command()
 def status() -> None:
     """Mostra o ultimo resultado de cada check."""
     table = Table(title="Estado atual", header_style="bold")
@@ -126,37 +140,36 @@ def status() -> None:
     table.add_column("Observacao", overflow="fold")
 
     with session_scope() as session:
-        rows = session.exec(
-            select(Asset, Check).join(Check, Check.asset_id == Asset.id).order_by(Asset.name)
-        ).all()
+        snapshots = asset_snapshots(session)
 
-        if not rows:
+        if not snapshots:
             console.print("[yellow]Nenhum ativo cadastrado.[/] Rode `netpulse seed` primeiro.")
             raise typer.Exit()
 
-        for asset, check in rows:
-            latest = session.exec(
-                select(CheckResult)
-                .where(CheckResult.check_id == check.id)
-                .order_by(CheckResult.ts.desc())
-                .limit(1)
-            ).first()
+        for snapshot in snapshots:
+            for check in snapshot.checks:
+                latest = snapshot.results.get(check.id)
+                if latest is None:
+                    table.add_row(
+                        snapshot.asset.name,
+                        snapshot.asset.address,
+                        check.label,
+                        "[dim]sem coleta[/]",
+                        "",
+                        "",
+                        "",
+                    )
+                    continue
 
-            if latest is None:
                 table.add_row(
-                    asset.name, asset.address, check.label, "[dim]sem coleta[/]", "", "", ""
+                    snapshot.asset.name,
+                    snapshot.asset.address,
+                    check.label,
+                    _render_status(latest.status),
+                    f"{latest.latency_ms:.0f} ms" if latest.latency_ms is not None else "—",
+                    latest.ts.strftime("%d/%m %H:%M:%S"),
+                    latest.error or "",
                 )
-                continue
-
-            table.add_row(
-                asset.name,
-                asset.address,
-                check.label,
-                _render_status(latest.status),
-                f"{latest.latency_ms:.0f} ms" if latest.latency_ms is not None else "—",
-                latest.ts.strftime("%d/%m %H:%M:%S"),
-                latest.error or "",
-            )
 
     console.print(table)
 
