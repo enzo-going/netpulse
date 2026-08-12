@@ -1,5 +1,7 @@
 # NetPulse
 
+[![CI](https://github.com/enzo-going/netpulse/actions/workflows/ci.yml/badge.svg)](https://github.com/enzo-going/netpulse/actions/workflows/ci.yml)
+
 Monitoramento de ativos de rede com correlação de falhas e análise de incidentes assistida por IA.
 
 Um monitor comum trata cada host como um problema isolado: quando o uplink de uma
@@ -24,10 +26,36 @@ netpulse seed     # cria o parque sintético
 netpulse run      # executa um ciclo de coleta
 netpulse status   # mostra o estado atual
 netpulse watch    # coleta continuamente
+netpulse serve    # sobe a API em http://127.0.0.1:8000
 ```
 
 Para monitorar uma rede de verdade, copie `.env.example` para `.env` e troque
 `NETPULSE_MODE` para `live`.
+
+## API
+
+Com `netpulse serve` no ar, a documentação interativa fica em
+[`/docs`](http://127.0.0.1:8000/docs) — gerada do próprio código, sem
+manutenção paralela.
+
+| Rota | O que faz |
+|---|---|
+| `GET /api/overview` | Resumo do parque: contadores por estado e a lista do que está com problema, do pior para o melhor |
+| `GET /api/assets` | Ativos com o estado consolidado; filtra por `estado`, `subnet` e `busca` |
+| `POST /api/assets` | Cria um ativo, opcionalmente já com seus checks |
+| `PATCH /api/assets/{id}` | Atualiza; trocar o endereço recalcula a sub-rede |
+| `POST /api/assets/{id}/checks` | Adiciona um check |
+| `GET /api/checks/{id}/history` | Série histórica para o gráfico de latência |
+| `GET /api/incidents` | Incidentes abertos e resolvidos |
+
+Dois detalhes de implementação que o `GET /api/overview` esconde:
+
+- **O estado de um ativo é o pior dos seus checks.** Um host que responde ao ping
+  mas perdeu a porta do serviço precisa aparecer como problema, não como sucesso
+  parcial.
+- **Uma consulta, não uma por check.** O último resultado de cada check sai de um
+  `ROW_NUMBER() OVER (PARTITION BY check_id)` — a tela inteira custa duas
+  consultas, independente do tamanho do parque.
 
 ## O que ele coleta
 
@@ -49,6 +77,9 @@ coletor (asyncio)  →  SQLite (WAL)  →  API (FastAPI)  →  dashboard (React)
   4 tipos de check              motor de incidentes → análise por IA
 ```
 
+O coletor e a API são processos independentes que só se falam pelo banco: a
+coleta continua rodando se a API cair, e vice-versa.
+
 Decisões que valem explicação:
 
 - **A sessão do banco nunca fica aberta durante a rede.** O coletor lê o que
@@ -65,7 +96,7 @@ Decisões que valem explicação:
 
 - [x] Modelo de dados, 4 tipos de check, coletor assíncrono e agendador
 - [x] Modo demo com parque sintético e CLI (`seed`, `run`, `watch`, `status`)
-- [ ] API REST com série histórica e incidentes
+- [x] API REST com série histórica, resumo do parque e leitura de incidentes
 - [ ] Motor de incidentes com correlação por sub-rede
 - [ ] Dashboard React (grade de ativos, latência, linha do tempo)
 - [ ] Análise de incidente por IA

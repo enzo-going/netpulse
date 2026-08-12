@@ -40,6 +40,29 @@ class Status(StrEnum):
     def is_failure(self) -> bool:
         return self in (Status.DOWN, Status.DEGRADED)
 
+    @property
+    def rank(self) -> int:
+        """Ordem de gravidade. Um ativo com varios checks assume o pior deles:
+        no painel, um host que responde ao ping mas perdeu a porta do servico
+        precisa aparecer como problema, nao como sucesso parcial."""
+        return _STATUS_RANK[self]
+
+
+_STATUS_RANK = {
+    Status.UP: 0,
+    Status.UNKNOWN: 1,
+    Status.DEGRADED: 2,
+    Status.DOWN: 3,
+}
+
+
+def worst_status(statuses) -> Status:
+    """O pior estado de um conjunto. Sem nenhum resultado, o estado e UNKNOWN."""
+    statuses = list(statuses)
+    if not statuses:
+        return Status.UNKNOWN
+    return max(statuses, key=lambda s: s.rank)
+
 
 class AssetKind(StrEnum):
     SERVER = "server"
