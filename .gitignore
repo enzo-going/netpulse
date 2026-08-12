@@ -29,10 +29,6 @@ frontend/dist/
 .vite/
 
 # Ferramentas de IA (nao versionadas)
-.claude/
-CLAUDE.md
-AGENTS.md
-.mcp.json
 
 # Sistema operacional / editores
 Thumbs.db
