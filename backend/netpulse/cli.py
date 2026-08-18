@@ -14,7 +14,7 @@ from netpulse import __version__
 from netpulse.collector import Collector
 from netpulse.config import get_settings
 from netpulse.db import init_db, session_scope
-from netpulse.demo import seed_demo
+from netpulse.demo import backfill_history, seed_demo
 from netpulse.models import Asset, Status
 from netpulse.queries import asset_snapshots
 from netpulse.scheduler import DEFAULT_TICK_SECONDS, run_forever
@@ -65,16 +65,33 @@ def init() -> None:
 @app.command()
 def seed(
     force: bool = typer.Option(False, "--force", help="Cria mesmo se ja houver ativos."),
+    horas: int = typer.Option(
+        24,
+        "--horas",
+        min=0,
+        max=720,
+        help="Horas de historico sintetico a gerar. Use 0 para nao gerar nenhum.",
+    ),
+    refazer: bool = typer.Option(
+        False,
+        "--refazer",
+        help="Apaga o historico existente da janela antes de gerar.",
+    ),
 ) -> None:
-    """Popula o parque sintetico do modo demo."""
+    """Popula o parque sintetico do modo demo, com serie historica."""
     init_db()
     with session_scope() as session:
         created = seed_demo(session, force=force)
+        pontos = backfill_history(session, hours=horas, replace=refazer) if horas else 0
 
     if created:
-        console.print(f"[green]{created} ativo(s) criado(s).[/] Rode `netpulse run` para coletar.")
+        console.print(f"[green]{created} ativo(s) criado(s).[/]")
     else:
         console.print("[yellow]Nada criado[/] — o banco ja tem ativos. Use --force para inserir.")
+
+    if pontos:
+        console.print(f"[green]{pontos} ponto(s)[/] de historico das ultimas {horas}h.")
+    console.print("Rode `netpulse serve` para abrir o painel.")
 
 
 @app.command()

@@ -22,12 +22,18 @@ precisa de inventário, credencial nem VPN.
 python -m venv .venv && . .venv/Scripts/activate   # Linux/macOS: . .venv/bin/activate
 pip install -e "backend[dev]"
 cd backend
-netpulse seed     # cria o parque sintético
+netpulse seed     # cria o parque sintético com 24h de histórico
 netpulse run      # executa um ciclo de coleta
 netpulse status   # mostra o estado atual
 netpulse watch    # coleta continuamente
 netpulse serve    # sobe a API em http://127.0.0.1:8000
 ```
+
+O `seed` já gera a série histórica das últimas 24 horas, senão o sistema abriria
+com um único ponto por check e nada para olhar. O histórico é **reproduzível**:
+cada resultado é derivado de `endereço:minuto`, então é exatamente o que a coleta
+real teria registrado naquele minuto — incluindo a queda roteirizada da filial.
+Ajuste com `--horas N`, ou desligue com `--horas 0`.
 
 Para monitorar uma rede de verdade, copie `.env.example` para `.env` e troque
 `NETPULSE_MODE` para `live`.
@@ -97,10 +103,11 @@ Decisões que valem explicação:
 - [x] Modelo de dados, 4 tipos de check, coletor assíncrono e agendador
 - [x] Modo demo com parque sintético e CLI (`seed`, `run`, `watch`, `status`)
 - [x] API REST com série histórica, resumo do parque e leitura de incidentes
+- [x] Histórico sintético reproduzível no `seed`, para a demo abrir com dados
 - [ ] Motor de incidentes com correlação por sub-rede
 - [ ] Dashboard React (grade de ativos, latência, linha do tempo)
 - [ ] Análise de incidente por IA
-- [ ] `docker compose up` e histórico pré-populado para a demo
+- [ ] `docker compose up` para a demo
 
 ## Desenvolvimento
 

@@ -19,7 +19,7 @@ from random import Random
 from sqlmodel import Session, select
 
 from netpulse.checks.base import CheckFn, CheckOutcome, CheckTarget
-from netpulse.models import Asset, AssetKind, Check, CheckType, Status
+from netpulse.models import Asset, AssetKind, Check, CheckResult, CheckType, Status
 
 # Sub-rede que sofre a queda coletiva roteirizada.
 OUTAGE_SUBNET_PREFIX = "198.51.100."
@@ -286,6 +286,74 @@ def demo_runner_for(check_type: CheckType) -> CheckFn:
         return synthesize(check_type, target)
 
     return runner
+
+
+def backfill_history(
+    session: Session,
+    *,
+    hours: int = 24,
+    now: datetime | None = None,
+    replace: bool = False,
+) -> int:
+    """Preenche a serie historica para tras, como se a coleta ja rodasse ha `hours`.
+
+    Sem isso o painel abre com um ponto por check: o grafico de latencia e a linha
+    do tempo ficam ilegiveis justamente na primeira impressao do projeto.
+
+    Nao ha nada de aleatorio aqui que nao seja reproduzivel: `synthesize` deriva o
+    resultado de `endereco:minuto`, entao a serie gerada agora e a mesma que a
+    coleta real teria produzido naquele minuto — inclusive as quedas roteirizadas
+    da filial e a oscilacao do host instavel.
+
+    Retorna quantos resultados foram inseridos.
+    """
+    now = (now or datetime.now(UTC)).replace(tzinfo=None)
+    inicio = now - timedelta(hours=hours)
+    inseridos = 0
+
+    for check in session.exec(select(Check)).all():
+        if check.id is None:
+            continue
+
+        if replace:
+            antigos = session.exec(
+                select(CheckResult).where(
+                    CheckResult.check_id == check.id, CheckResult.ts >= inicio
+                )
+            ).all()
+            for antigo in antigos:
+                session.delete(antigo)
+
+        asset = session.get(Asset, check.asset_id)
+        if asset is None:
+            continue
+
+        target = CheckTarget(
+            address=asset.address,
+            params=dict(check.params),
+            timeout=check.timeout_seconds,
+        )
+        passo = timedelta(seconds=check.interval_seconds)
+
+        # Comeca no passado e caminha ate agora, respeitando o intervalo do check:
+        # a densidade da serie fica igual a que a coleta real teria gerado.
+        ts = inicio
+        while ts < now:
+            outcome = synthesize(check.type, target, now=ts.replace(tzinfo=UTC))
+            session.add(
+                CheckResult(
+                    check_id=check.id,
+                    ts=ts,
+                    status=outcome.status,
+                    latency_ms=outcome.latency_ms,
+                    detail=dict(outcome.detail),
+                    error=outcome.error,
+                )
+            )
+            inseridos += 1
+            ts += passo
+
+    return inseridos
 
 
 def seed_demo(session: Session, *, force: bool = False) -> int:

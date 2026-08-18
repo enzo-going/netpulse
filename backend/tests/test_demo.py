@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlmodel import Session, select
@@ -10,12 +10,13 @@ from netpulse.demo import (
     DEMO_ASSETS,
     EXPIRING_CERT_ADDRESS,
     SLOW_ADDRESS,
+    backfill_history,
     demo_runner_for,
     is_outage_window,
     seed_demo,
     synthesize,
 )
-from netpulse.models import Asset, Check, CheckType, Status
+from netpulse.models import Asset, Check, CheckResult, CheckType, Status
 
 
 def at(minute: int) -> datetime:
@@ -116,6 +117,97 @@ class TestSeed:
             assert seed_demo(session, force=True) == 0
             session.commit()
             assert len(session.exec(select(Asset)).all()) == len(DEMO_ASSETS)
+
+
+class TestBackfillHistory:
+    """O historico sintetico existe para o painel abrir com grafico legivel."""
+
+    def _parque(self, session: Session) -> None:
+        seed_demo(session)
+        session.commit()
+
+    def test_gera_um_ponto_por_intervalo_de_cada_check(self, engine) -> None:
+        agora = datetime(2026, 8, 6, 14, 0, 0, tzinfo=UTC)
+        with Session(engine) as session:
+            self._parque(session)
+            checks = session.exec(select(Check)).all()
+            esperado = sum(2 * 3600 // c.interval_seconds for c in checks)
+
+            inseridos = backfill_history(session, hours=2, now=agora)
+            session.commit()
+
+            assert inseridos == esperado
+            assert len(session.exec(select(CheckResult)).all()) == esperado
+
+    def test_serie_cobre_a_janela_pedida_e_para_no_presente(self, engine) -> None:
+        agora = datetime(2026, 8, 6, 14, 0, 0, tzinfo=UTC)
+        with Session(engine) as session:
+            self._parque(session)
+            backfill_history(session, hours=6, now=agora)
+            session.commit()
+
+            marcas = sorted(r.ts for r in session.exec(select(CheckResult)).all())
+            assert marcas[0] >= agora.replace(tzinfo=None) - timedelta(hours=6)
+            assert marcas[-1] < agora.replace(tzinfo=None)
+
+    def test_reproduz_a_queda_roteirizada_da_filial(self, engine) -> None:
+        """A serie gerada precisa conter a queda coletiva, nao so ruido."""
+        agora = datetime(2026, 8, 6, 14, 0, 0, tzinfo=UTC)
+        with Session(engine) as session:
+            self._parque(session)
+            backfill_history(session, hours=2, now=agora)
+            session.commit()
+
+            filial = session.exec(
+                select(Asset).where(Asset.address.startswith("198.51.100."))  # type: ignore[attr-defined]
+            ).first()
+            assert filial is not None
+            checks = session.exec(select(Check).where(Check.asset_id == filial.id)).all()
+            ids = [c.id for c in checks]
+            pontos = session.exec(select(CheckResult).where(CheckResult.check_id.in_(ids))).all()  # type: ignore[attr-defined]
+
+            derrubados = [p for p in pontos if p.status is Status.DOWN]
+            assert derrubados, "a filial deveria cair dentro da janela roteirizada"
+            assert len(derrubados) < len(pontos), "nao pode ficar derrubada o tempo todo"
+
+    def test_e_deterministico(self, engine) -> None:
+        """Mesma janela, mesmo resultado: a serie nao pode virar ruido aleatorio."""
+        agora = datetime(2026, 8, 6, 14, 0, 0, tzinfo=UTC)
+        with Session(engine) as session:
+            self._parque(session)
+            backfill_history(session, hours=1, now=agora)
+            session.commit()
+            primeira = [
+                (r.check_id, r.ts, r.status) for r in session.exec(select(CheckResult)).all()
+            ]
+
+            backfill_history(session, hours=1, now=agora, replace=True)
+            session.commit()
+            segunda = [
+                (r.check_id, r.ts, r.status) for r in session.exec(select(CheckResult)).all()
+            ]
+
+            assert sorted(primeira) == sorted(segunda)
+
+    def test_refazer_nao_duplica_a_janela(self, engine) -> None:
+        agora = datetime(2026, 8, 6, 14, 0, 0, tzinfo=UTC)
+        with Session(engine) as session:
+            self._parque(session)
+            backfill_history(session, hours=1, now=agora)
+            session.commit()
+            antes = len(session.exec(select(CheckResult)).all())
+
+            backfill_history(session, hours=1, now=agora, replace=True)
+            session.commit()
+
+            assert len(session.exec(select(CheckResult)).all()) == antes
+
+    def test_horas_zero_nao_gera_nada(self, engine) -> None:
+        with Session(engine) as session:
+            self._parque(session)
+            assert backfill_history(session, hours=0) == 0
+            session.commit()
+            assert session.exec(select(CheckResult)).all() == []
 
 
 def test_todos_os_ativos_demo_usam_faixas_de_documentacao() -> None:
