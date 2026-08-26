@@ -1,0 +1,59 @@
+.overview-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.overview-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  border-left: 3px solid var(--line-strong);
+}
+
+.overview-tile__value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+  /* Figuras proporcionais mesmo em número grande: tabular deixa "121" largo
+     demais em display size. Ver marks-and-anatomy.md da skill de dataviz. */
+  font-variant-numeric: proportional-nums;
+}
+
+.overview-tile__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.overview-tile--good {
+  border-left-color: var(--status-good);
+}
+.overview-tile--good .overview-tile__value {
+  color: var(--status-good);
+}
+
+.overview-tile--warning {
+  border-left-color: var(--status-warning);
+}
+.overview-tile--warning .overview-tile__value {
+  color: var(--status-warning);
+}
+
+.overview-tile--critical {
+  border-left-color: var(--status-critical);
+}
+.overview-tile--critical .overview-tile__value {
+  color: var(--status-critical);
+}
+
+.overview-tile--accent {
+  border-left-color: var(--accent);
+}
+.overview-tile--accent .overview-tile__value {
+  color: var(--accent);
+}
