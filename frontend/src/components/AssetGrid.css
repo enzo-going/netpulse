@@ -1,0 +1,170 @@
+.asset-grid__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.asset-grid__search {
+  flex: 1 1 240px;
+  padding: 0.55rem 0.8rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 0.88rem;
+}
+.asset-grid__search:focus-visible {
+  outline: 2px solid var(--accent-dim);
+  outline-offset: 1px;
+}
+.asset-grid__search::placeholder {
+  color: var(--subtle);
+}
+
+.asset-grid__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.asset-grid__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    border-color 160ms var(--ease),
+    color 160ms var(--ease),
+    background 160ms var(--ease);
+}
+.asset-grid__filter:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+.asset-grid__filter.is-active {
+  background: var(--accent-soft);
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+
+.asset-grid__filter-count {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+.asset-grid__state {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.asset-grid__state--error {
+  color: var(--status-critical);
+}
+
+.asset-grid__hint {
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.asset-grid__hint code {
+  color: var(--text);
+  background: var(--panel-raised);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.asset-grid__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.asset-grid__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.asset-grid__table th {
+  text-align: left;
+  padding: 0.7rem 1rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--subtle);
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.asset-grid__table td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.asset-row:last-child td {
+  border-bottom: none;
+}
+
+.asset-row:hover {
+  background: var(--panel-raised);
+}
+
+/* Uma faixa esquerda discreta reforça o estado sem repetir cor sobre cor —
+   a badge já carrega ícone + texto; isso é só um sinal periférico. */
+.asset-row {
+  border-left: 2px solid transparent;
+}
+.asset-row--down {
+  border-left-color: var(--status-critical);
+}
+.asset-row--degraded {
+  border-left-color: var(--status-warning);
+}
+
+.asset-row__name {
+  font-weight: 600;
+}
+
+.asset-row__location {
+  font-size: 0.76rem;
+  color: var(--subtle);
+  margin-top: 0.1rem;
+}
+
+.asset-row__address {
+  color: var(--muted);
+}
+
+.asset-row__kind {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.asset-row__seen {
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .asset-grid__table th:nth-child(3),
+  .asset-grid__table td:nth-child(3) {
+    display: none; /* tipo do ativo some primeiro em telas estreitas */
+  }
+}

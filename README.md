@@ -10,8 +10,9 @@ O NetPulse agrupa falhas simultâneas da mesma sub-rede em um único incidente e
 pede ao modelo uma hipótese de causa a partir do contexto — o histórico do ativo,
 o que caiu junto e o que continuou de pé.
 
-> **Status:** em construção. O núcleo de coleta está pronto e testado; a API, o
-> dashboard e a camada de IA são os próximos passos — veja o [roteiro](#roteiro).
+> **Status:** em construção. Coleta, API e a grade de ativos do dashboard estão
+> prontas e testadas; o motor de incidentes e a camada de IA são os próximos
+> passos — veja o [roteiro](#roteiro).
 
 ## Como rodar
 
@@ -27,6 +28,14 @@ netpulse run      # executa um ciclo de coleta
 netpulse status   # mostra o estado atual
 netpulse watch    # coleta continuamente
 netpulse serve    # sobe a API em http://127.0.0.1:8000
+```
+
+Para abrir o painel, em outro terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev       # http://localhost:5173
 ```
 
 O `seed` já gera a série histórica das últimas 24 horas, senão o sistema abriria
@@ -105,7 +114,8 @@ Decisões que valem explicação:
 - [x] API REST com série histórica, resumo do parque e leitura de incidentes
 - [x] Histórico sintético reproduzível no `seed`, para a demo abrir com dados
 - [ ] Motor de incidentes com correlação por sub-rede
-- [ ] Dashboard React (grade de ativos, latência, linha do tempo)
+- [x] Dashboard React — grade de ativos com busca, filtro por estado e resumo
+- [ ] Dashboard: gráfico de latência e linha do tempo de incidentes
 - [ ] Análise de incidente por IA
 - [ ] `docker compose up` para a demo
 
@@ -114,9 +124,12 @@ Decisões que valem explicação:
 ```bash
 cd backend
 ruff check . && ruff format --check . && pytest -q
+
+cd ../frontend
+npx oxlint && npm run build
 ```
 
-A CI roda os três em Python 3.11, 3.12 e 3.13.
+A CI roda o backend em Python 3.11, 3.12 e 3.13, e o frontend no Node 22.
 
 ## Sobre os dados
 

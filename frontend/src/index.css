@@ -1,0 +1,88 @@
+/* Paleta de status validada contra as superfícies escuras abaixo — ver
+   references/palette.md da skill de dataviz. Contraste WCAG conferido:
+   good 5.75:1, warning 10.52:1, serious 7.32:1, critical 4.02:1, unknown 3.99:1
+   contra --panel (#0c0e13). Nenhuma cor de status carrega significado sozinha:
+   toda badge de status leva ícone + texto (ver StatusBadge.tsx). */
+:root {
+  color-scheme: dark;
+
+  --bg: #060709;
+  --panel: #0c0e13;
+  --panel-raised: #10131a;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+
+  --text: #f4f5f8;
+  --muted: #9da4b0;
+  --subtle: #686f7c;
+
+  --accent: rgb(255, 145, 0);
+  --accent-dim: rgba(255, 145, 0, 0.55);
+  --accent-soft: rgba(255, 145, 0, 0.1);
+
+  --status-good: #0ca30c;
+  --status-good-bg: rgba(12, 163, 12, 0.14);
+  --status-warning: #fab219;
+  --status-warning-bg: rgba(250, 178, 25, 0.14);
+  --status-serious: #ec835a;
+  --status-serious-bg: rgba(236, 131, 90, 0.14);
+  --status-critical: #d03b3b;
+  --status-critical-bg: rgba(208, 59, 59, 0.16);
+  --status-unknown: #6b7280;
+  --status-unknown-bg: rgba(107, 114, 128, 0.14);
+
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --radius: 10px;
+  --ease: cubic-bezier(0.2, 0.7, 0.15, 1);
+
+  font-family: var(--font-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
