@@ -206,14 +206,28 @@ def process_results(
             session.add(incident)
             session.flush()
 
-        session.add(
-            IncidentMember(
-                incident_id=incident.id,
-                asset_id=asset.id,
-                check_id=check.id,
-                first_failure_at=result.ts,
+        # Um check que ja participou deste incidente e se recuperou pode voltar a
+        # falhar antes dele fechar — um host que oscila e o caso comum, nao a
+        # excecao. Reabrir a participacao existente em vez de inserir outra linha
+        # respeita a unicidade (incident_id, check_id) e mantem `first_failure_at`
+        # apontando para o inicio real do problema.
+        membro = session.exec(
+            select(IncidentMember).where(
+                IncidentMember.incident_id == incident.id,
+                IncidentMember.check_id == check.id,
             )
-        )
+        ).first()
+        if membro is None:
+            session.add(
+                IncidentMember(
+                    incident_id=incident.id,
+                    asset_id=asset.id,
+                    check_id=check.id,
+                    first_failure_at=result.ts,
+                )
+            )
+        else:
+            membro.recovered_at = None
         session.flush()
         _refresh_incident_summary(session, incident)
         touched[incident.id] = incident
