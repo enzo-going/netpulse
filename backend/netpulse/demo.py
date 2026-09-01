@@ -45,6 +45,16 @@ SLOW_ADDRESS = "192.0.2.32"
 EXPIRING_CERT_ADDRESS = "203.0.113.21"
 EXPIRING_CERT_DAYS = 9
 
+# Quanto cada tipo de check custa alem da ida e volta na rede. Um ping so espera
+# o eco; o TCP abre conexao; o TLS ainda negocia certificado; o SNMP consulta um
+# OID no agente, que responde no proprio tempo dele.
+CHECK_LATENCY_FACTOR: dict[CheckType, float] = {
+    CheckType.PING: 1.0,
+    CheckType.TCP: 1.35,
+    CheckType.SSL: 2.1,
+    CheckType.SNMP: 1.7,
+}
+
 
 DEMO_ASSETS: list[dict] = [
     # Matriz — 192.0.2.0/24
@@ -246,7 +256,13 @@ def synthesize(
     if address == FLAKY_ADDRESS and rng.random() < 0.15:
         return CheckOutcome.down("host inalcancavel (instabilidade simulada)", simulated=True)
 
+    # O custo do proprio check entra na conta. Sem isso todos os checks de um
+    # mesmo ativo devolvem latencia identica no mesmo minuto, e o painel desenha
+    # graficos sobrepostos — parece defeito mesmo nao sendo. A ordem imita a
+    # real: o ping so espera o eco, o TCP abre conexao, o TLS ainda negocia
+    # certificado e o SNMP consulta um OID no agente.
     latency = _baseline_latency(address) + rng.random() * 6
+    latency = latency * CHECK_LATENCY_FACTOR.get(check_type, 1.0) + rng.random() * 2
     if address == SLOW_ADDRESS:
         latency += 130
 
