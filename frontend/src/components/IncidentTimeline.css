@@ -1,0 +1,180 @@
+.incident-timeline {
+  margin-bottom: 1.5rem;
+}
+
+.section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.section-kicker {
+  margin: 0 0 0.15rem;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.incident-timeline__mode {
+  color: var(--subtle);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.incident-timeline__list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.incident-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3px 1fr;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.incident-card__rail {
+  background: var(--status-warning);
+}
+
+.incident-card--critical .incident-card__rail {
+  background: var(--status-critical);
+}
+
+.incident-card__content {
+  min-width: 0;
+  padding: 0.85rem 1rem;
+}
+
+.incident-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.incident-card h3,
+.incident-card p {
+  margin: 0;
+}
+
+.incident-card h3 {
+  margin-top: 0.15rem;
+  font-size: 0.9rem;
+}
+
+.incident-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--subtle);
+  font-size: 0.7rem;
+}
+
+.incident-card__status {
+  color: var(--status-critical);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.incident-card__status.is-resolved {
+  color: var(--status-good);
+}
+
+.incident-card__count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.incident-card__members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.65rem;
+}
+
+.incident-card__members span {
+  padding: 0.2rem 0.45rem;
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+}
+
+.incident-card__analysis {
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  background: var(--accent-soft);
+  border-left: 2px solid var(--accent);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: pre-line;
+}
+
+.incident-card__analysis strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+}
+
+.incident-card__analysis small {
+  display: block;
+  margin-top: 0.4rem;
+  color: var(--subtle);
+}
+
+.incident-card__ai-action {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.65rem;
+}
+
+.incident-card__ai-action button {
+  padding: 0.35rem 0.65rem;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-dim);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.incident-card__ai-action button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.incident-card__ai-action small {
+  color: var(--subtle);
+  font-size: 0.68rem;
+}
+
+.incident-timeline__empty,
+.incident-timeline__error {
+  padding: 1rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.incident-timeline__error {
+  color: var(--status-critical);
+}

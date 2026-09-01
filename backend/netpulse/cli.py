@@ -14,7 +14,7 @@ from netpulse import __version__
 from netpulse.collector import Collector
 from netpulse.config import get_settings
 from netpulse.db import init_db, session_scope
-from netpulse.demo import backfill_history, seed_demo
+from netpulse.demo import backfill_history, seed_demo, seed_demo_incidents
 from netpulse.models import Asset, Status
 from netpulse.queries import asset_snapshots
 from netpulse.scheduler import DEFAULT_TICK_SECONDS, run_forever
@@ -83,6 +83,7 @@ def seed(
     with session_scope() as session:
         created = seed_demo(session, force=force)
         pontos = backfill_history(session, hours=horas, replace=refazer) if horas else 0
+        incident_members = seed_demo_incidents(session)
 
     if created:
         console.print(f"[green]{created} ativo(s) criado(s).[/]")
@@ -91,6 +92,10 @@ def seed(
 
     if pontos:
         console.print(f"[green]{pontos} ponto(s)[/] de historico das ultimas {horas}h.")
+    if incident_members:
+        console.print(
+            f"[green]1 incidente correlacionado[/] com {incident_members} checks afetados."
+        )
     console.print("Rode `netpulse serve` para abrir o painel.")
 
 

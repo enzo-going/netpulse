@@ -19,7 +19,18 @@ from random import Random
 from sqlmodel import Session, select
 
 from netpulse.checks.base import CheckFn, CheckOutcome, CheckTarget
-from netpulse.models import Asset, AssetKind, Check, CheckResult, CheckType, Status
+from netpulse.models import (
+    Asset,
+    AssetKind,
+    Check,
+    CheckResult,
+    CheckType,
+    Incident,
+    IncidentMember,
+    IncidentStatus,
+    Severity,
+    Status,
+)
 
 # Sub-rede que sofre a queda coletiva roteirizada.
 OUTAGE_SUBNET_PREFIX = "198.51.100."
@@ -394,3 +405,53 @@ def seed_demo(session: Session, *, force: bool = False) -> int:
         created += 1
 
     return created
+
+
+def seed_demo_incidents(session: Session, *, now: datetime | None = None) -> int:
+    """Registra uma queda coletiva passada para a demo abrir com uma linha do tempo.
+
+    O coletor continua sendo quem cria incidentes futuros. Este registro sintetico
+    representa a ultima janela roteirizada completa e e idempotente.
+    """
+    existing = session.exec(select(Incident)).first()
+    if existing is not None:
+        return 0
+
+    now = (now or datetime.now(UTC)).replace(tzinfo=None, second=0, microsecond=0)
+    block_start = now - timedelta(minutes=now.minute % OUTAGE_PERIOD_MINUTES)
+    if now < block_start + timedelta(minutes=OUTAGE_DURATION_MINUTES):
+        block_start -= timedelta(minutes=OUTAGE_PERIOD_MINUTES)
+    recovered_at = block_start + timedelta(minutes=OUTAGE_DURATION_MINUTES)
+
+    branch_assets = session.exec(
+        select(Asset).where(Asset.subnet == "198.51.100.0/24").order_by(Asset.name)
+    ).all()
+    if not branch_assets:
+        return 0
+
+    incident = Incident(
+        title=f"Queda correlacionada em {len(branch_assets)} ativos — 198.51.100.0/24",
+        status=IncidentStatus.RESOLVED,
+        severity=Severity.CRITICAL,
+        correlation_key="subnet:198.51.100.0/24",
+        subnet="198.51.100.0/24",
+        opened_at=block_start,
+        resolved_at=recovered_at,
+    )
+    session.add(incident)
+    session.flush()
+
+    member_count = 0
+    for asset in branch_assets:
+        for check in asset.checks:
+            session.add(
+                IncidentMember(
+                    incident_id=incident.id,
+                    asset_id=asset.id,
+                    check_id=check.id,
+                    first_failure_at=block_start,
+                    recovered_at=recovered_at,
+                )
+            )
+            member_count += 1
+    return member_count

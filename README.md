@@ -4,17 +4,32 @@
 
 Monitoramento de ativos de rede com correlação de falhas e análise de incidentes assistida por IA.
 
+![Dashboard do NetPulse com incidentes correlacionados](docs/assets/dashboard-incidents.png)
+
 Um monitor comum trata cada host como um problema isolado: quando o uplink de uma
 filial cai, ele dispara um alerta por equipamento e enterra o operador em ruído.
 O NetPulse agrupa falhas simultâneas da mesma sub-rede em um único incidente e
-pede ao modelo uma hipótese de causa a partir do contexto — o histórico do ativo,
+pode pedir ao modelo uma hipótese de causa a partir do contexto — o histórico do ativo,
 o que caiu junto e o que continuou de pé.
 
-> **Status:** em construção. Coleta, API e a grade de ativos do dashboard estão
-> prontas e testadas; o motor de incidentes e a camada de IA são os próximos
-> passos — veja o [roteiro](#roteiro).
+> **Status:** marco v0.1 funcional. Coleta, API, dashboard, histórico e motor de
+> incidentes estão prontos e testados. A análise por IA é opcional e só acontece
+> quando o operador solicita — veja o [roteiro](#roteiro).
 
-## Como rodar
+## Demo em um comando
+
+```bash
+docker compose up --build
+```
+
+Abra <http://localhost:8000>. O Compose cria um parque sintético com 24 horas de
+histórico, uma queda coletiva já correlacionada e resolvida, a API e um coletor
+contínuo. API e coletor compartilham apenas o volume SQLite; nenhum endereço do
+modo demo é acessado pela rede.
+
+Para limpar completamente a demonstração: `docker compose down -v`.
+
+## Desenvolvimento local
 
 O modo demo simula um parque de 20 ativos e **não toca em nenhuma rede**. Não
 precisa de inventário, credencial nem VPN.
@@ -62,6 +77,7 @@ manutenção paralela.
 | `POST /api/assets/{id}/checks` | Adiciona um check |
 | `GET /api/checks/{id}/history` | Série histórica para o gráfico de latência |
 | `GET /api/incidents` | Incidentes abertos e resolvidos |
+| `POST /api/incidents/{id}/analysis` | Gera, sob demanda, um parecer opcional por IA |
 
 Dois detalhes de implementação que o `GET /api/overview` esconde:
 
@@ -88,8 +104,10 @@ Qualquer check aceita `degraded_above_ms`: respondeu, mas devagar, vira
 
 ```
 coletor (asyncio)  →  SQLite (WAL)  →  API (FastAPI)  →  dashboard (React)
-       ↑                                     ↓
-  4 tipos de check              motor de incidentes → análise por IA
+       ↑                    ↓                ↓
+  4 tipos de check    correlação       histórico e incidentes
+                           ↓
+                parecer opcional por IA
 ```
 
 O coletor e a API são processos independentes que só se falam pelo banco: a
@@ -104,8 +122,15 @@ Decisões que valem explicação:
   intervalo; o laço acorda a cada tick e roda o que venceu.
 - **Um check quebrado não derruba o ciclo.** Exceção inesperada vira um resultado
   `unknown` gravado, não uma coleta perdida.
-- **A IA é opcional.** Sem `ANTHROPIC_API_KEY`, tudo funciona igual e apenas o
-  parecer do incidente não é gerado.
+- **O incidente não depende da IA.** Três falhas consecutivas confirmam o
+  problema; quedas da mesma sub-rede dentro de 180 segundos entram no mesmo
+  incidente. Degradações, como certificado vencendo, permanecem separadas para
+  não fabricar uma causa comum. O incidente fecha somente quando todos os checks
+  afetados se recuperam.
+- **A IA é opcional e explícita.** Sem `ANTHROPIC_API_KEY`, tudo funciona igual.
+  Com a chave configurada e o extra `ai` instalado, o operador pode pedir um
+  parecer no dashboard. Essa ação envia nomes, localizações, checks e mensagens
+  de erro daquele incidente ao provedor; nunca ocorre durante a coleta.
 
 ## Roteiro
 
@@ -113,11 +138,11 @@ Decisões que valem explicação:
 - [x] Modo demo com parque sintético e CLI (`seed`, `run`, `watch`, `status`)
 - [x] API REST com série histórica, resumo do parque e leitura de incidentes
 - [x] Histórico sintético reproduzível no `seed`, para a demo abrir com dados
-- [ ] Motor de incidentes com correlação por sub-rede
+- [x] Motor de incidentes com limiar, correlação por sub-rede e resolução automática
 - [x] Dashboard React — grade de ativos com busca, filtro por estado e resumo
-- [ ] Dashboard: gráfico de latência e linha do tempo de incidentes
-- [ ] Análise de incidente por IA
-- [ ] `docker compose up` para a demo
+- [x] Dashboard: detalhe do ativo, gráfico de latência e linha do tempo de incidentes
+- [x] Análise de incidente por IA, opcional e acionada pelo operador
+- [x] `docker compose up --build` para a demo reproduzível
 
 ## Desenvolvimento
 

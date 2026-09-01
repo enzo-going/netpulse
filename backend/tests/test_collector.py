@@ -3,11 +3,23 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 
+import pytest
 from sqlmodel import Session, select
 
 from netpulse.checks.base import CheckFn, CheckOutcome, CheckTarget
 from netpulse.collector import Collector, due_checks
-from netpulse.models import Asset, Check, CheckResult, CheckType, Status, utcnow
+from netpulse.config import get_settings
+from netpulse.models import (
+    Asset,
+    Check,
+    CheckResult,
+    CheckType,
+    Incident,
+    IncidentMember,
+    IncidentStatus,
+    Status,
+    utcnow,
+)
 
 
 def make_asset(session: Session, name: str, address: str, **check_kwargs) -> Check:
@@ -170,3 +182,28 @@ class TestCollector:
 
         with Session(engine) as session:
             assert session.exec(select(CheckResult)).all() == []
+
+    async def test_ciclo_correlaciona_e_resolve_queda_coletiva(
+        self,
+        engine,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("NETPULSE_FAILURE_THRESHOLD", "1")
+        get_settings.cache_clear()
+        with Session(engine) as session:
+            make_asset(session, "sw-filial", "198.51.100.2")
+            make_asset(session, "pc-filial", "198.51.100.20")
+            session.commit()
+            jobs = due_checks(session)
+
+        down = Collector(engine, runner_factory=constant_factory(CheckOutcome(Status.DOWN)))
+        await down.run_jobs(jobs)
+        with Session(engine) as session:
+            incident = session.exec(select(Incident)).one()
+            assert incident.title == "Queda correlacionada em 2 ativos — 198.51.100.0/24"
+            assert len(session.exec(select(IncidentMember)).all()) == 2
+
+        recovered = Collector(engine, runner_factory=constant_factory(CheckOutcome(Status.UP)))
+        await recovered.run_jobs(jobs)
+        with Session(engine) as session:
+            assert session.exec(select(Incident)).one().status is IncidentStatus.RESOLVED

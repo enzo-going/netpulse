@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     correlation_window: int = Field(
         default=180, ge=0, validation_alias="NETPULSE_CORRELATION_WINDOW"
     )
+    frontend_dir: str | None = Field(default=None, validation_alias="NETPULSE_FRONTEND_DIR")
 
     anthropic_api_key: str | None = Field(default=None, validation_alias="ANTHROPIC_API_KEY")
     ai_model: str = Field(default="claude-sonnet-5", validation_alias="NETPULSE_AI_MODEL")
