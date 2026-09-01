@@ -242,6 +242,28 @@ class TestDemoIncidents:
             assert seed_demo_incidents(session, now=at(15)) == 0
 
 
+def test_tipos_de_check_tem_latencias_distintas() -> None:
+    """Sem isso, dois checks do mesmo ativo desenham graficos sobrepostos no
+    painel — o que parece defeito mesmo nao sendo."""
+    alvo = CheckTarget(address="192.0.2.10", params={"port": 443})
+    medidas = {
+        tipo: synthesize(tipo, alvo, now=at(5)).latency_ms
+        for tipo in (CheckType.PING, CheckType.TCP, CheckType.SSL, CheckType.SNMP)
+    }
+
+    assert len(set(medidas.values())) == len(medidas), "tipos diferentes, latencia igual"
+    # A ordem imita a real: o ping so espera o eco; o TLS negocia certificado.
+    assert medidas[CheckType.PING] < medidas[CheckType.TCP] < medidas[CheckType.SSL]
+
+
+def test_latencia_continua_deterministica() -> None:
+    """A serie historica reproduzivel depende disso."""
+    alvo = CheckTarget(address="192.0.2.10")
+    primeira = synthesize(CheckType.PING, alvo, now=at(5)).latency_ms
+    segunda = synthesize(CheckType.PING, alvo, now=at(5)).latency_ms
+    assert primeira == segunda
+
+
 def test_todos_os_ativos_demo_usam_faixas_de_documentacao() -> None:
     """RFC 5737: nenhum endereco do modo demo pode rotear para uma rede real."""
     permitidos = ("192.0.2.", "198.51.100.", "203.0.113.")
