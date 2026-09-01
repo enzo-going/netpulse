@@ -169,3 +169,36 @@ def test_falha_fora_da_janela_abre_outro_incidente(engine) -> None:
         process(session, [add_result(session, a, Status.DOWN, offset=0)], window=30)
         process(session, [add_result(session, b, Status.DOWN, offset=60)], window=30)
         assert len(session.exec(select(Incident)).all()) == 2
+
+
+def test_recaida_dentro_do_incidente_reabre_o_membro(engine) -> None:
+    """Um host que oscila nao pode derrubar o processamento.
+
+    O membro ja existe no incidente; inserir outro violaria a unicidade
+    (incident_id, check_id) e, como process_results roda na mesma transacao da
+    coleta, levaria junto os resultados daquele ciclo.
+    """
+    with Session(engine) as session:
+        instavel = make_check(session, "instavel", "198.51.100.1")
+        vizinho = make_check(session, "vizinho", "198.51.100.2")
+
+        process(
+            session,
+            [
+                add_result(session, instavel, Status.DOWN),
+                add_result(session, vizinho, Status.DOWN),
+            ],
+        )
+
+        # O instavel volta, mas o vizinho segue caido: o incidente continua aberto.
+        process(session, [add_result(session, instavel, Status.UP, offset=60)])
+        assert session.exec(select(Incident)).one().status is IncidentStatus.OPEN
+
+        # E cai de novo, ainda dentro do mesmo incidente.
+        process(session, [add_result(session, instavel, Status.DOWN, offset=120)])
+
+        membros = session.exec(
+            select(IncidentMember).where(IncidentMember.check_id == instavel.id)
+        ).all()
+        assert len(membros) == 1, "a participacao foi duplicada em vez de reaberta"
+        assert membros[0].recovered_at is None
