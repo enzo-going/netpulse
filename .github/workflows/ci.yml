@@ -74,3 +74,42 @@ jobs:
 
       - name: Construir imagem da demo
         run: docker build --tag netpulse:ci .
+
+      # Construir a imagem nao prova que a demo funciona: o painel so e servido
+      # se o build do front chegou ao lugar certo e se a API o monta. Aqui a
+      # pilha sobe de verdade e o teste e o que a pessoa faria — abrir a pagina.
+      - name: Subir a pilha
+        run: docker compose up --detach --wait
+
+      - name: A API responde
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:8000/api/health
+
+      - name: O painel e servido na mesma origem
+        run: |
+          pagina=$(curl --fail --silent --show-error http://127.0.0.1:8000/)
+          echo "$pagina" | grep -q "<title>NetPulse</title>" \
+            || { echo "a raiz nao devolveu o painel:"; echo "$pagina" | head -20; exit 1; }
+          # O HTML sozinho nao basta: sem o bundle a tela abre em branco.
+          bundle=$(echo "$pagina" | grep -oE '/assets/[^"]+\.js' | head -1)
+          test -n "$bundle" || { echo "o HTML nao referencia bundle algum"; exit 1; }
+          curl --fail --silent --show-error --output /dev/null "http://127.0.0.1:8000$bundle"
+
+      - name: A demo abre com dados
+        run: |
+          resumo=$(curl --fail --silent --show-error http://127.0.0.1:8000/api/overview)
+          echo "$resumo"
+          # Uma demo que abre com o parque vazio nao demonstra nada.
+          python -c "
+          import json, sys
+          d = json.loads(sys.argv[1])
+          assert d['total_assets'] > 0, 'a demo subiu sem nenhum ativo'
+          " "$resumo"
+
+      - name: Diagnostico quando algo falha
+        if: failure()
+        run: docker compose logs --no-color --tail 60
+
+      - name: Derrubar a pilha
+        if: always()
+        run: docker compose down --volumes
