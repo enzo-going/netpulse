@@ -1,4 +1,12 @@
-import type { AssetStatusRead, OverviewRead, Status } from "./types";
+import type {
+  AssetStatusRead,
+  CheckHistoryRead,
+  HealthRead,
+  IncidentRead,
+  IncidentStatus,
+  OverviewRead,
+  Status,
+} from "./types";
 
 /**
  * Em produção o dashboard é servido pela mesma origem da API (ver README —
@@ -20,10 +28,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string): Promise<T> {
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${BASE_URL}${path}`);
+    response = await fetch(`${BASE_URL}${path}`, init);
   } catch {
     throw new ApiError("Não foi possível falar com a API do NetPulse.", 0);
   }
@@ -53,4 +61,45 @@ export function listAssets(params: AssetListParams = {}): Promise<AssetStatusRea
 
 export function getOverview(): Promise<OverviewRead> {
   return request<OverviewRead>("/api/overview");
+}
+
+export function getHealth(): Promise<HealthRead> {
+  return request<HealthRead>("/api/health");
+}
+
+export function getAsset(assetId: number): Promise<AssetStatusRead> {
+  return request<AssetStatusRead>(`/api/assets/${assetId}`);
+}
+
+export function getCheckHistory(
+  checkId: number,
+  horas = 24,
+): Promise<CheckHistoryRead> {
+  return request<CheckHistoryRead>(`/api/checks/${checkId}/history?horas=${horas}`);
+}
+
+export interface AssetDetails {
+  asset: AssetStatusRead;
+  histories: Record<number, CheckHistoryRead>;
+}
+
+export async function getAssetDetails(assetId: number): Promise<AssetDetails> {
+  const asset = await getAsset(assetId);
+  const entries = await Promise.all(
+    asset.checks.map(async ({ check }) => [check.id, await getCheckHistory(check.id)] as const),
+  );
+  return { asset, histories: Object.fromEntries(entries) };
+}
+
+export function listIncidents(
+  estado?: IncidentStatus,
+  limite = 12,
+): Promise<IncidentRead[]> {
+  const query = new URLSearchParams({ limite: String(limite) });
+  if (estado) query.set("estado", estado);
+  return request<IncidentRead[]>(`/api/incidents?${query}`);
+}
+
+export function analyzeIncident(incidentId: number): Promise<IncidentRead> {
+  return request<IncidentRead>(`/api/incidents/${incidentId}/analysis`, { method: "POST" });
 }

@@ -141,10 +141,10 @@ class CheckHistoryRead(BaseModel):
 
 
 class IncidentMemberRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     asset_id: int
+    asset_name: str
     check_id: int
+    check_label: str
     first_failure_at: UtcDatetime
     recovered_at: UtcDatetime | None
 

@@ -63,3 +63,14 @@ jobs:
       # falha o job antes de empacotar.
       - name: Checagem de tipos e build
         run: npm run build
+
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Validar Compose
+        run: docker compose config --quiet
+
+      - name: Construir imagem da demo
+        run: docker build --tag netpulse:ci .

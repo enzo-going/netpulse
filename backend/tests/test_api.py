@@ -4,14 +4,25 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from netpulse.api.app import create_app
+from netpulse.config import get_settings
 from netpulse.db import get_session
-from netpulse.models import Asset, Check, CheckResult, CheckType, Status, utcnow
+from netpulse.models import (
+    Asset,
+    Check,
+    CheckResult,
+    CheckType,
+    Incident,
+    IncidentMember,
+    Status,
+    utcnow,
+)
 
 
 @pytest.fixture
@@ -65,6 +76,22 @@ class TestHealth:
         resposta = client.get("/", follow_redirects=False)
         assert resposta.status_code == 307
         assert resposta.headers["location"] == "/docs"
+
+    def test_serve_o_dashboard_quando_o_build_esta_configurado(
+        self,
+        engine,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "index.html").write_text("<h1>NetPulse dashboard</h1>", encoding="utf-8")
+        monkeypatch.setenv("NETPULSE_FRONTEND_DIR", str(tmp_path))
+        get_settings.cache_clear()
+        app = create_app(lifespan_enabled=False)
+
+        with TestClient(app) as static_client:
+            resposta = static_client.get("/")
+        assert resposta.status_code == 200
+        assert "NetPulse dashboard" in resposta.text
 
 
 class TestCriacao:
@@ -291,6 +318,70 @@ class TestIncidentes:
 
     def test_incidente_inexistente_da_404(self, client: TestClient) -> None:
         assert client.get("/api/incidents/1").status_code == 404
+
+    def test_detalhe_traz_nomes_dos_ativos_e_checks(self, client: TestClient, engine) -> None:
+        (check_id,) = criar_ativo(engine, "srv-filial", "198.51.100.10", [(CheckType.PING, {})])
+        with Session(engine) as session:
+            check = session.get(Check, check_id)
+            incident = Incident(
+                title="Falha confirmada em srv-filial",
+                correlation_key="subnet:198.51.100.0/24",
+                subnet="198.51.100.0/24",
+            )
+            session.add(incident)
+            session.flush()
+            session.add(
+                IncidentMember(
+                    incident_id=incident.id,
+                    asset_id=check.asset_id,
+                    check_id=check.id,
+                )
+            )
+            session.commit()
+            incident_id = incident.id
+
+        corpo = client.get(f"/api/incidents/{incident_id}").json()
+        assert corpo["members"][0]["asset_name"] == "srv-filial"
+        assert corpo["members"][0]["check_label"] == "ping"
+
+    def test_analise_sem_chave_e_explicitamente_desabilitada(
+        self, client: TestClient, engine
+    ) -> None:
+        with Session(engine) as session:
+            incident = Incident(title="teste", correlation_key="asset:1")
+            session.add(incident)
+            session.commit()
+            incident_id = incident.id
+
+        resposta = client.post(f"/api/incidents/{incident_id}/analysis")
+        assert resposta.status_code == 503
+        assert "ANTHROPIC_API_KEY" in resposta.text
+
+    def test_analise_solicitada_fica_persistida(
+        self,
+        client: TestClient,
+        engine,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        with Session(engine) as session:
+            incident = Incident(title="teste", correlation_key="asset:1")
+            session.add(incident)
+            session.commit()
+            incident_id = incident.id
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "chave-de-teste")
+        get_settings.cache_clear()
+
+        def fake_analysis(_session, current, settings) -> str:
+            current.analysis = "Hipotese controlada para teste."
+            current.analysis_model = settings.ai_model
+            current.analysis_at = utcnow()
+            return current.analysis
+
+        monkeypatch.setattr("netpulse.analysis.generate_analysis", fake_analysis)
+        resposta = client.post(f"/api/incidents/{incident_id}/analysis")
+        assert resposta.status_code == 200
+        assert resposta.json()["analysis"] == "Hipotese controlada para teste."
 
 
 def test_openapi_e_gerado(client: TestClient) -> None:

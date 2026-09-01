@@ -20,6 +20,7 @@ from netpulse.checks import get_runner
 from netpulse.checks.base import CheckFn, CheckOutcome, CheckTarget
 from netpulse.config import Mode, get_settings
 from netpulse.db import session_scope
+from netpulse.incidents import process_results
 from netpulse.models import Asset, Check, CheckResult, CheckType, Status, utcnow
 
 logger = logging.getLogger(__name__)
@@ -144,17 +145,18 @@ class Collector:
         ts = utcnow()
         collected: list[Collected] = []
         with session_scope(self.engine) as session:
+            persisted: list[CheckResult] = []
             for job, outcome in zip(jobs, outcomes, strict=True):
-                session.add(
-                    CheckResult(
-                        check_id=job.check_id,
-                        ts=ts,
-                        status=outcome.status,
-                        latency_ms=outcome.latency_ms,
-                        detail=dict(outcome.detail),
-                        error=outcome.error,
-                    )
+                result = CheckResult(
+                    check_id=job.check_id,
+                    ts=ts,
+                    status=outcome.status,
+                    latency_ms=outcome.latency_ms,
+                    detail=dict(outcome.detail),
+                    error=outcome.error,
                 )
+                session.add(result)
+                persisted.append(result)
                 collected.append(
                     Collected(
                         check_id=job.check_id,
@@ -165,6 +167,13 @@ class Collector:
                         ts=ts,
                     )
                 )
+            settings = get_settings()
+            process_results(
+                session,
+                persisted,
+                failure_threshold=settings.failure_threshold,
+                correlation_window=settings.correlation_window,
+            )
         return collected
 
     async def run_once(self, *, now: datetime | None = None) -> list[Collected]:

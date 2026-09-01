@@ -16,7 +16,11 @@ const FILTERS: { value: Status | "all"; label: string }[] = [
   { value: "unknown", label: "Desconhecido" },
 ];
 
-export function AssetGrid() {
+interface AssetGridProps {
+  onSelect: (assetId: number) => void;
+}
+
+export function AssetGrid({ onSelect }: AssetGridProps) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Status | "all">("all");
 
@@ -111,7 +115,7 @@ export function AssetGrid() {
             </thead>
             <tbody>
               {filtered.map((asset) => (
-                <AssetRow key={asset.id} asset={asset} />
+                <AssetRow key={asset.id} asset={asset} onSelect={onSelect} />
               ))}
             </tbody>
           </table>
@@ -121,11 +125,24 @@ export function AssetGrid() {
   );
 }
 
-function AssetRow({ asset }: { asset: AssetStatusRead }) {
+function AssetRow({
+  asset,
+  onSelect,
+}: {
+  asset: AssetStatusRead;
+  onSelect: (assetId: number) => void;
+}) {
   return (
     <tr className={`asset-row asset-row--${asset.status}`}>
       <td>
-        <div className="asset-row__name">{asset.name}</div>
+        <button
+          type="button"
+          className="asset-row__name"
+          onClick={() => onSelect(asset.id)}
+          aria-label={`Abrir detalhes de ${asset.name}`}
+        >
+          {asset.name}
+        </button>
         {asset.location && <div className="asset-row__location">{asset.location}</div>}
       </td>
       <td className="mono asset-row__address">{asset.address}</td>

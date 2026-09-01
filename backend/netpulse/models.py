@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from ipaddress import IPv4Network, ip_address, ip_network
 
-from sqlalchemy import JSON, Column, Index
+from sqlalchemy import JSON, Column, Index, UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -202,7 +202,10 @@ class IncidentMember(SQLModel, table=True):
     """Ligacao entre um incidente e cada check que falhou dentro dele."""
 
     __tablename__ = "incident_members"
-    __table_args__ = (Index("ix_incident_members_incident_check", "incident_id", "check_id"),)
+    __table_args__ = (
+        Index("ix_incident_members_incident_check", "incident_id", "check_id"),
+        UniqueConstraint("incident_id", "check_id", name="uq_incident_members_incident_check"),
+    )
 
     id: int | None = Field(default=None, primary_key=True)
     incident_id: int = Field(foreign_key="incidents.id", index=True, ondelete="CASCADE")

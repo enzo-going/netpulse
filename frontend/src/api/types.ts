@@ -17,6 +17,8 @@ export type AssetKind =
   | "service"
   | "other";
 export type CheckType = "ping" | "tcp" | "ssl" | "snmp";
+export type IncidentStatus = "open" | "resolved";
+export type Severity = "info" | "warning" | "critical";
 
 export interface CheckRead {
   id: number;
@@ -66,4 +68,47 @@ export interface OverviewRead {
   counts: Record<Status, number>;
   open_incidents: number;
   degraded_or_down: AssetStatusRead[];
+}
+
+export interface HistoryPoint {
+  ts: string;
+  status: Status;
+  latency_ms: number | null;
+}
+
+export interface CheckHistoryRead {
+  check_id: number;
+  hours: number;
+  points: HistoryPoint[];
+}
+
+export interface IncidentMemberRead {
+  asset_id: number;
+  asset_name: string;
+  check_id: number;
+  check_label: string;
+  first_failure_at: string;
+  recovered_at: string | null;
+}
+
+export interface IncidentRead {
+  id: number;
+  title: string;
+  status: IncidentStatus;
+  severity: Severity;
+  correlation_key: string;
+  subnet: string | null;
+  opened_at: string;
+  resolved_at: string | null;
+  analysis: string | null;
+  analysis_model: string | null;
+  analysis_at: string | null;
+  members: IncidentMemberRead[];
+}
+
+export interface HealthRead {
+  status: string;
+  version: string;
+  mode: string;
+  ai_enabled: boolean;
 }

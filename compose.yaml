@@ -1,0 +1,46 @@
+services:
+  api:
+    build: .
+    environment:
+      NETPULSE_MODE: demo
+      NETPULSE_DATABASE_URL: sqlite:////data/netpulse.db
+      NETPULSE_FRONTEND_DIR: /app/frontend
+      NETPULSE_FAILURE_THRESHOLD: 3
+      NETPULSE_CORRELATION_WINDOW: 180
+    command:
+      - sh
+      - -c
+      - netpulse seed --horas 24 --refazer && exec netpulse serve --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - netpulse-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+    restart: unless-stopped
+
+  collector:
+    build: .
+    environment:
+      NETPULSE_MODE: demo
+      NETPULSE_DATABASE_URL: sqlite:////data/netpulse.db
+      NETPULSE_FAILURE_THRESHOLD: 3
+      NETPULSE_CORRELATION_WINDOW: 180
+    command: ["netpulse", "watch", "--tick", "5"]
+    volumes:
+      - netpulse-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  netpulse-data:

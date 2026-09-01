@@ -2,13 +2,16 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 
 from netpulse import __version__
 from netpulse.api.routers import assets, checks, incidents, overview
+from netpulse.config import get_settings
 from netpulse.db import init_db
 
 # O front em desenvolvimento roda no Vite; em producao ele e servido pela mesma
@@ -55,9 +58,17 @@ def create_app(*, lifespan_enabled: bool = True) -> FastAPI:
     app.include_router(checks.router)
     app.include_router(incidents.router)
 
-    @app.get("/", include_in_schema=False)
-    def raiz() -> RedirectResponse:
-        return RedirectResponse("/docs")
+    frontend_dir = get_settings().frontend_dir
+    frontend_path = Path(frontend_dir) if frontend_dir else None
+    if frontend_path is not None and (frontend_path / "index.html").is_file():
+        # Montado por ultimo: /api e /docs continuam com precedencia. `html=True`
+        # entrega index.html na raiz e mantem o dashboard na mesma origem da API.
+        app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+    else:
+
+        @app.get("/", include_in_schema=False)
+        def raiz() -> RedirectResponse:
+            return RedirectResponse("/docs")
 
     return app
 

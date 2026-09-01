@@ -14,9 +14,19 @@ from netpulse.demo import (
     demo_runner_for,
     is_outage_window,
     seed_demo,
+    seed_demo_incidents,
     synthesize,
 )
-from netpulse.models import Asset, Check, CheckResult, CheckType, Status
+from netpulse.models import (
+    Asset,
+    Check,
+    CheckResult,
+    CheckType,
+    Incident,
+    IncidentMember,
+    IncidentStatus,
+    Status,
+)
 
 
 def at(minute: int) -> datetime:
@@ -208,6 +218,28 @@ class TestBackfillHistory:
             assert backfill_history(session, hours=0) == 0
             session.commit()
             assert session.exec(select(CheckResult)).all() == []
+
+
+class TestDemoIncidents:
+    def test_cria_uma_queda_coletiva_resolvida(self, engine) -> None:
+        with Session(engine) as session:
+            seed_demo(session)
+            members = seed_demo_incidents(session, now=at(15))
+            session.commit()
+
+            incident = session.exec(select(Incident)).one()
+            assert incident.status is IncidentStatus.RESOLVED
+            assert incident.subnet == "198.51.100.0/24"
+            assert "Queda correlacionada" in incident.title
+            assert members == len(session.exec(select(IncidentMember)).all())
+            assert members > 1
+
+    def test_e_idempotente(self, engine) -> None:
+        with Session(engine) as session:
+            seed_demo(session)
+            assert seed_demo_incidents(session, now=at(15)) > 0
+            session.commit()
+            assert seed_demo_incidents(session, now=at(15)) == 0
 
 
 def test_todos_os_ativos_demo_usam_faixas_de_documentacao() -> None:
