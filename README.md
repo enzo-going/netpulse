@@ -10,9 +10,9 @@ O NetPulse agrupa falhas simultâneas da mesma sub-rede em um único incidente e
 pede ao modelo uma hipótese de causa a partir do contexto — o histórico do ativo,
 o que caiu junto e o que continuou de pé.
 
-> **Status:** em construção. Coleta, API e a grade de ativos do dashboard estão
-> prontas e testadas; o motor de incidentes e a camada de IA são os próximos
-> passos — veja o [roteiro](#roteiro).
+> **Status:** em construção. Coleta, correlação de incidentes, API e a grade de
+> ativos do dashboard estão prontas e testadas; a camada de IA e o resto do
+> painel são os próximos passos — veja o [roteiro](#roteiro).
 
 ## Como rodar
 
@@ -72,6 +72,29 @@ Dois detalhes de implementação que o `GET /api/overview` esconde:
   `ROW_NUMBER() OVER (PARTITION BY check_id)` — a tela inteira custa duas
   consultas, independente do tamanho do parque.
 
+## Incidentes
+
+Falhas simultâneas viram **um** incidente, não um alerta por host. É a razão de
+existir do projeto: quando o uplink de uma filial cai, seis equipamentos param
+juntos — e isso é um problema, não seis.
+
+| Variável | Padrão | O que faz |
+|---|---|---|
+| `NETPULSE_FAILURE_THRESHOLD` | 3 | Coletas seguidas em falha antes de abrir. Um pacote perdido não é uma queda |
+| `NETPULSE_CORRELATION_WINDOW` | 180 | Segundos de distância que duas falhas podem ter e ainda serem o mesmo evento |
+
+A chave de correlação é a **sub-rede** quando o endereço é IPv4; para hostname e
+IPv6 cai para a **localização** do ativo, e na falta das duas o ativo responde por
+si — sempre o maior escopo disponível, nunca um inventado.
+
+O incidente fecha sozinho quando todos os membros voltam, e cada membro guarda
+quando falhou e quando se recuperou. Um ativo que cai depois entra no incidente
+que já está aberto (escalando a gravidade para `critical`) em vez de abrir um
+segundo; um que cai muito depois, fora da janela, é outro evento.
+
+Estado `degraded` conta como falha: responder devagar é o aviso que costuma
+anteceder a queda, e ignorá-lo perderia justamente o alerta útil.
+
 ## O que ele coleta
 
 | Check | O que mede | Observações |
@@ -113,7 +136,7 @@ Decisões que valem explicação:
 - [x] Modo demo com parque sintético e CLI (`seed`, `run`, `watch`, `status`)
 - [x] API REST com série histórica, resumo do parque e leitura de incidentes
 - [x] Histórico sintético reproduzível no `seed`, para a demo abrir com dados
-- [ ] Motor de incidentes com correlação por sub-rede
+- [x] Motor de incidentes com correlação por sub-rede
 - [x] Dashboard React — grade de ativos com busca, filtro por estado e resumo
 - [ ] Dashboard: gráfico de latência e linha do tempo de incidentes
 - [ ] Análise de incidente por IA

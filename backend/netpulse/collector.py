@@ -16,6 +16,7 @@ from datetime import datetime
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from netpulse import incidents
 from netpulse.checks import get_runner
 from netpulse.checks.base import CheckFn, CheckOutcome, CheckTarget
 from netpulse.config import Mode, get_settings
@@ -165,6 +166,18 @@ class Collector:
                         ts=ts,
                     )
                 )
+
+            # Reavalia com os resultados desta rodada ja na sessao, na mesma
+            # transacao: nao existe instante em que a serie historica diz que
+            # caiu e o incidente ainda nao sabe.
+            session.flush()
+            try:
+                incidents.evaluate(session, now=ts)
+            except Exception:
+                # Correlacao quebrada nao pode custar a coleta — o dado bruto ja
+                # esta gravado e a proxima rodada reavalia do zero.
+                logger.exception("falha ao avaliar incidentes; a coleta segue")
+
         return collected
 
     async def run_once(self, *, now: datetime | None = None) -> list[Collected]:
