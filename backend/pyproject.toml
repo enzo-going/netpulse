@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-snmp = ["pysnmp>=6.2"]
+snmp = ["pysnmp>=7.1.29"]
 ai = ["anthropic>=1.5.0"]
 dev = [
     "pytest>=8.3",
