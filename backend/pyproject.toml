@@ -12,7 +12,7 @@ authors = [{ name = "Enzo Going" }]
 dependencies = [
     "sqlmodel>=0.0.45",
     "pydantic-settings>=2.5",
-    "fastapi>=0.115",
+    "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.4",
     "typer>=0.15",
     "rich>=15.0.0",
