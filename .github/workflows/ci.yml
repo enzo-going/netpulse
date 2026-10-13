@@ -4,6 +4,11 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Semanal: as dependencias tem so piso, entao uma versao nova pode quebrar
+  # a main sem nenhum push. Sem isso a quebra so aparece no proximo PR.
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
