@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Enzo Going" }]
 dependencies = [
-    "sqlmodel>=0.0.22",
+    "sqlmodel>=0.0.45",
     "pydantic-settings>=2.5",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.52.4",
