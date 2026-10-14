@@ -27,6 +27,10 @@ histórico, uma queda coletiva já correlacionada e resolvida, a API e um coleto
 contínuo. API e coletor compartilham apenas o volume SQLite; nenhum endereço do
 modo demo é acessado pela rede.
 
+A API ainda não tem autenticação, então o Compose publica a porta só nesta
+máquina (`127.0.0.1:8000`): na rede, qualquer um poderia cadastrar ativos e
+fazer o coletor sondar endereços a partir do servidor.
+
 Para limpar completamente a demonstração: `docker compose down -v`.
 
 ## Desenvolvimento local

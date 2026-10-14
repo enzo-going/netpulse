@@ -11,8 +11,10 @@ services:
       - sh
       - -c
       - netpulse seed --horas 24 --refazer && exec netpulse serve --host 0.0.0.0 --port 8000
+    # A API não tem autenticação: a porta fica só nesta máquina. Para abrir na
+    # rede, troque por "8000:8000" sabendo que qualquer um ali cadastra ativos.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - netpulse-data:/data
     healthcheck:
