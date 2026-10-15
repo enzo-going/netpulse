@@ -48,7 +48,7 @@
   border-left-color: var(--status-critical);
 }
 .overview-tile--critical .overview-tile__value {
-  color: var(--status-critical);
+  color: var(--status-critical-text);
 }
 
 .overview-tile--accent {

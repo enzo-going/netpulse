@@ -94,7 +94,7 @@
 }
 
 .asset-detail__state.is-error {
-  color: var(--status-critical);
+  color: var(--status-critical-text);
 }
 
 @media (max-width: 560px) {
