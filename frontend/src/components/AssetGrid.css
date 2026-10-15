@@ -71,7 +71,7 @@
 }
 
 .asset-grid__state--error {
-  color: var(--status-critical);
+  color: var(--status-critical-text);
 }
 
 .asset-grid__hint {

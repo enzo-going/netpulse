@@ -14,7 +14,7 @@
 
   --text: #f4f5f8;
   --muted: #9da4b0;
-  --subtle: #686f7c;
+  --subtle: #777f8d; /* contraste >= 4,6:1 em todos os fundos (WCAG AA) */
 
   --accent: rgb(255, 145, 0);
   --accent-dim: rgba(255, 145, 0, 0.55);
@@ -28,8 +28,12 @@
   --status-serious-bg: rgba(236, 131, 90, 0.14);
   --status-critical: #d03b3b;
   --status-critical-bg: rgba(208, 59, 59, 0.16);
+  /* Como texto, o vermelho e o cinza de status precisam de um tom mais claro
+     para chegar a 4,5:1 (WCAG AA); bordas, barras e gráficos seguem os de cima. */
+  --status-critical-text: #da6363;
   --status-unknown: #6b7280;
   --status-unknown-bg: rgba(107, 114, 128, 0.14);
+  --status-unknown-text: #838994;
 
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;

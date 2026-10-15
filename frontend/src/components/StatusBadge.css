@@ -24,11 +24,11 @@
   background: var(--status-warning-bg);
 }
 .status-badge--down {
-  color: var(--status-critical);
+  color: var(--status-critical-text);
   background: var(--status-critical-bg);
 }
 .status-badge--unknown {
-  color: var(--status-unknown);
+  color: var(--status-unknown-text);
   background: var(--status-unknown-bg);
 }
 

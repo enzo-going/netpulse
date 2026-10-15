@@ -84,7 +84,7 @@
 }
 
 .incident-card__status {
-  color: var(--status-critical);
+  color: var(--status-critical-text);
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -176,5 +176,5 @@
 }
 
 .incident-timeline__error {
-  color: var(--status-critical);
+  color: var(--status-critical-text);
 }
