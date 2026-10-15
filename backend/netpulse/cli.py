@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import UTC, datetime, tzinfo
 
 import typer
 from rich.console import Console
@@ -36,6 +37,16 @@ _STATUS_STYLE = {
 
 def _render_status(status: Status) -> str:
     return f"[{_STATUS_STYLE[status]}]{status.value}[/]"
+
+
+def _local_time(ts: datetime, tz: tzinfo | None = None) -> str:
+    """Hora de uma coleta no fuso de quem le o terminal.
+
+    O banco guarda UTC sem fuso (ver `utcnow`); formatar direto mostrava o
+    horario UTC como se fosse local, 3h adiantado no Brasil. O painel ja
+    converte do lado do navegador; aqui a conversao e a mesma, no fuso da maquina.
+    """
+    return ts.replace(tzinfo=UTC).astimezone(tz).strftime("%d/%m %H:%M:%S")
 
 
 def _configure_logging(verbose: bool) -> None:
@@ -189,7 +200,7 @@ def status() -> None:
                     check.label,
                     _render_status(latest.status),
                     f"{latest.latency_ms:.0f} ms" if latest.latency_ms is not None else "—",
-                    latest.ts.strftime("%d/%m %H:%M:%S"),
+                    _local_time(latest.ts),
                     latest.error or "",
                 )
 
