@@ -59,8 +59,8 @@ class APIConnectionError(APIError):
     pass
 
 
-def _resposta(*blocos, stop_reason="end_turn"):
-    return SimpleNamespace(stop_reason=stop_reason, content=list(blocos))
+def _resposta(*blocos, stop_reason="end_turn", model="claude-sonnet-5"):
+    return SimpleNamespace(stop_reason=stop_reason, content=list(blocos), model=model)
 
 
 def _texto(texto):
@@ -69,12 +69,13 @@ def _texto(texto):
 
 @pytest.fixture
 def provedor(monkeypatch):
-    """Instala o SDK falso; `provedor.resultado` e o que `messages.create` devolve ou levanta."""
+    """Instala o SDK falso; `provedor.resultado` sai de `beta.messages.create` (ou e levantado)."""
     estado = SimpleNamespace(pedidos=[], resultado=_resposta(_texto("Hipotese: uplink da filial.")))
 
     class Anthropic:
         def __init__(self, api_key):
             estado.api_key = api_key
+            self.beta = self
             self.messages = self
 
         def create(self, **pedido):
@@ -141,6 +142,42 @@ def test_pedido_nao_envia_amostragem_e_deixa_folga_para_o_pensamento(provedor, i
     assert "sw-filial" in contexto
     assert "local=Filial Centro" in contexto
     assert "observacao=sem resposta ao ping" in contexto
+
+
+def test_modelo_padrao_vai_com_fallback_no_servidor(provedor, incidente) -> None:
+    session, incident = incidente
+
+    generate_analysis(session, incident, Settings(ANTHROPIC_API_KEY="chave-de-teste"))
+
+    (pedido,) = provedor.pedidos
+    assert pedido["model"] == "claude-opus-5-5"
+    assert pedido["betas"] == ["server-side-fallback-2026-07-01"]
+    assert pedido["fallbacks"] == "default"
+
+
+@pytest.mark.parametrize("modelo", ["claude-sonnet-5", "claude-haiku-5-5"])
+def test_modelo_sem_fallback_no_servidor_nao_recebe_o_parametro(
+    provedor, incidente, modelo
+) -> None:
+    session, incident = incidente
+
+    generate_analysis(
+        session, incident, Settings(ANTHROPIC_API_KEY="chave-de-teste", NETPULSE_AI_MODEL=modelo)
+    )
+
+    (pedido,) = provedor.pedidos
+    assert "fallbacks" not in pedido
+    assert "betas" not in pedido
+
+
+def test_parecer_registra_o_modelo_que_de_fato_respondeu(provedor, incidente) -> None:
+    session, incident = incidente
+    # Recusa no modelo pedido e resposta vinda do fallback.
+    provedor.resultado = _resposta(_texto("Hipotese: uplink."), model="claude-opus-4-8")
+
+    generate_analysis(session, incident, Settings(ANTHROPIC_API_KEY="chave-de-teste"))
+
+    assert incident.analysis_model == "claude-opus-4-8"
 
 
 def test_parecer_usa_so_os_blocos_de_texto_e_fica_no_incidente(provedor, incidente) -> None:
