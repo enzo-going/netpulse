@@ -64,6 +64,21 @@ SYSTEM_PROMPT = (
 )
 
 
+def _failure_message(anthropic, exc: Exception, settings: Settings) -> str:
+    """O que o operador precisa saber para agir; o detalhe tecnico fica no log."""
+    if isinstance(exc, anthropic.AuthenticationError | anthropic.PermissionDeniedError):
+        return "a chave ANTHROPIC_API_KEY foi recusada pelo provedor"
+    if isinstance(exc, anthropic.NotFoundError):
+        return f"o modelo {settings.ai_model} nao existe no provedor; confira NETPULSE_AI_MODEL"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "limite de uso do provedor atingido; tente de novo em instantes"
+    if isinstance(exc, anthropic.BadRequestError):
+        return "o provedor recusou o pedido; detalhes no log do servidor"
+    if isinstance(exc, anthropic.APIStatusError):
+        return f"o provedor de IA respondeu com erro {exc.status_code}; tente mais tarde"
+    return "o provedor de IA nao respondeu"
+
+
 def generate_analysis(session: Session, incident: Incident, settings: Settings) -> str:
     if not settings.anthropic_api_key:
         raise AnalysisUnavailable("a analise por IA nao esta configurada")
@@ -82,9 +97,14 @@ def generate_analysis(session: Session, incident: Incident, settings: Settings) 
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": context}],
         )
-    except Exception as exc:  # fronteira da integracao externa
+    except anthropic.APIError as exc:  # fronteira da integracao externa
         logger.exception("falha ao solicitar parecer do incidente %s", incident.id)
-        raise AnalysisUnavailable("o provedor de IA nao respondeu") from exc
+        raise AnalysisUnavailable(_failure_message(anthropic, exc, settings)) from exc
+
+    if response.stop_reason == "refusal":
+        raise AnalysisUnavailable("o provedor recusou gerar o parecer deste incidente")
+    if response.stop_reason == "max_tokens":
+        raise AnalysisUnavailable("o parecer veio incompleto (limite de tokens atingido)")
 
     # So blocos de texto: os de pensamento chegam vazios e nao entram no parecer.
     text = "\n".join(block.text for block in response.content if block.type == "text").strip()
