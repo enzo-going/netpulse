@@ -1,0 +1,165 @@
+"""Parecer por IA: o pedido que sai para o provedor e o que volta para o operador.
+
+O extra `ai` nao e instalado no CI, entao o SDK entra como um modulo falso com a
+mesma forma (cliente, blocos de resposta e hierarquia de erros).
+"""
+
+from __future__ import annotations
+
+import sys
+import types
+from types import SimpleNamespace
+
+import pytest
+from sqlmodel import Session
+
+from netpulse.analysis import AnalysisUnavailable, generate_analysis
+from netpulse.config import Settings
+from netpulse.models import (
+    Asset,
+    AssetKind,
+    Check,
+    CheckResult,
+    CheckType,
+    Incident,
+    IncidentMember,
+    Status,
+)
+
+
+class APIError(Exception):
+    pass
+
+
+class APIStatusError(APIError):
+    status_code = 500
+
+
+class BadRequestError(APIStatusError):
+    status_code = 400
+
+
+class AuthenticationError(APIStatusError):
+    status_code = 401
+
+
+class PermissionDeniedError(APIStatusError):
+    status_code = 403
+
+
+class NotFoundError(APIStatusError):
+    status_code = 404
+
+
+class RateLimitError(APIStatusError):
+    status_code = 429
+
+
+class APIConnectionError(APIError):
+    pass
+
+
+def _resposta(*blocos, stop_reason="end_turn"):
+    return SimpleNamespace(stop_reason=stop_reason, content=list(blocos))
+
+
+def _texto(texto):
+    return SimpleNamespace(type="text", text=texto)
+
+
+@pytest.fixture
+def provedor(monkeypatch):
+    """Instala o SDK falso; `provedor.resultado` e o que `messages.create` devolve ou levanta."""
+    estado = SimpleNamespace(pedidos=[], resultado=_resposta(_texto("Hipotese: uplink da filial.")))
+
+    class Anthropic:
+        def __init__(self, api_key):
+            estado.api_key = api_key
+            self.messages = self
+
+        def create(self, **pedido):
+            estado.pedidos.append(pedido)
+            if isinstance(estado.resultado, Exception):
+                raise estado.resultado
+            return estado.resultado
+
+    modulo = types.ModuleType("anthropic")
+    modulo.Anthropic = Anthropic
+    for erro in (
+        APIError,
+        APIStatusError,
+        BadRequestError,
+        AuthenticationError,
+        PermissionDeniedError,
+        NotFoundError,
+        RateLimitError,
+        APIConnectionError,
+    ):
+        setattr(modulo, erro.__name__, erro)
+    monkeypatch.setitem(sys.modules, "anthropic", modulo)
+    return estado
+
+
+@pytest.fixture
+def incidente(engine):
+    with Session(engine) as session:
+        asset = Asset(
+            name="sw-filial", address="10.0.5.1", kind=AssetKind.SWITCH, location="Filial Centro"
+        )
+        session.add(asset)
+        session.flush()
+        check = Check(asset_id=asset.id, type=CheckType.PING)
+        session.add(check)
+        session.flush()
+        session.add(
+            CheckResult(check_id=check.id, status=Status.DOWN, error="sem resposta ao ping")
+        )
+        incident = Incident(title="Queda na 10.0.5.0/24", correlation_key="subnet:10.0.5.0/24")
+        session.add(incident)
+        session.flush()
+        session.add(IncidentMember(incident_id=incident.id, asset_id=asset.id, check_id=check.id))
+        session.commit()
+        yield session, incident
+
+
+def _settings():
+    return Settings(ANTHROPIC_API_KEY="chave-de-teste", NETPULSE_AI_MODEL="claude-sonnet-5")
+
+
+def test_pedido_nao_envia_amostragem_e_deixa_folga_para_o_pensamento(provedor, incidente) -> None:
+    session, incident = incidente
+
+    generate_analysis(session, incident, _settings())
+
+    (pedido,) = provedor.pedidos
+    # temperature/top_p/top_k fora do padrao devolvem 400 nos modelos atuais.
+    assert not {"temperature", "top_p", "top_k"} & pedido.keys()
+    assert pedido["model"] == "claude-sonnet-5"
+    assert pedido["max_tokens"] >= 4000
+    assert "dados nao confiaveis" in pedido["system"]
+    contexto = pedido["messages"][0]["content"]
+    assert "sw-filial" in contexto
+    assert "local=Filial Centro" in contexto
+    assert "observacao=sem resposta ao ping" in contexto
+
+
+def test_parecer_usa_so_os_blocos_de_texto_e_fica_no_incidente(provedor, incidente) -> None:
+    session, incident = incidente
+    provedor.resultado = _resposta(
+        SimpleNamespace(type="thinking", thinking=""), _texto("Hipotese: uplink.")
+    )
+
+    texto = generate_analysis(session, incident, _settings())
+
+    assert texto == "Hipotese: uplink."
+    assert incident.analysis == "Hipotese: uplink."
+    assert incident.analysis_model == "claude-sonnet-5"
+    assert incident.analysis_at is not None
+
+
+def test_sem_chave_nao_chama_o_provedor(provedor, incidente) -> None:
+    session, incident = incidente
+
+    with pytest.raises(AnalysisUnavailable, match="nao esta configurada"):
+        generate_analysis(session, incident, Settings(ANTHROPIC_API_KEY=None))
+    assert provedor.pedidos == []
