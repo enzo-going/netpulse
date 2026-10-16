@@ -157,6 +157,43 @@ def test_parecer_usa_so_os_blocos_de_texto_e_fica_no_incidente(provedor, inciden
     assert incident.analysis_at is not None
 
 
+@pytest.mark.parametrize(
+    ("erro", "mensagem"),
+    [
+        (AuthenticationError(), "chave ANTHROPIC_API_KEY foi recusada"),
+        (NotFoundError(), "modelo claude-sonnet-5 nao existe"),
+        (RateLimitError(), "limite de uso"),
+        (BadRequestError(), "recusou o pedido"),
+        (APIStatusError(), "erro 500"),
+        (APIConnectionError(), "nao respondeu"),
+    ],
+)
+def test_erro_do_provedor_vira_mensagem_util_e_nao_grava_parecer(
+    provedor, incidente, erro, mensagem
+) -> None:
+    session, incident = incidente
+    provedor.resultado = erro
+
+    with pytest.raises(AnalysisUnavailable, match=mensagem):
+        generate_analysis(session, incident, _settings())
+    assert incident.analysis is None
+
+
+@pytest.mark.parametrize(
+    ("stop_reason", "mensagem"),
+    [("refusal", "recusou gerar o parecer"), ("max_tokens", "incompleto")],
+)
+def test_recusa_ou_corte_nao_gravam_parecer_pela_metade(
+    provedor, incidente, stop_reason, mensagem
+) -> None:
+    session, incident = incidente
+    provedor.resultado = _resposta(_texto("Hipotese: upl"), stop_reason=stop_reason)
+
+    with pytest.raises(AnalysisUnavailable, match=mensagem):
+        generate_analysis(session, incident, _settings())
+    assert incident.analysis is None
+
+
 def test_sem_chave_nao_chama_o_provedor(provedor, incidente) -> None:
     session, incident = incidente
 
